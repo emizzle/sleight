@@ -10,20 +10,21 @@ int main(int argc, char *argv[])
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
     QGuiApplication app(argc, argv);
+    qmlRegisterSingletonType<Status>("im.status.desktop.Status", 1, 0, "Status",
+        [](QQmlEngine *engine, QJSEngine *scriptEngine) -> QObject *{
+            Q_UNUSED(engine)
+            Q_UNUSED(scriptEngine)
+
+            Status * status = new Status();
+            return status;
+        });
+
 
     QQmlApplicationEngine engine;
     const QUrl url(QStringLiteral("qrc:/main.qml"));
-    /* QObject::connect(&engine, &QQmlApplicationEngine::objectCreated, */
-    /*                  &app, [url](QObject *obj, const QUrl &objUrl) { */
-    /*     if (!obj && url == objUrl) */
-    /*         QCoreApplication::exit(-1); */
-    /* }, Qt::QueuedConnection); */
-    engine.load(url);
 
-    QVector<QString> paths;
-    paths.append("m/43'/60'/1581'/0'/0"); 
-    paths.append("m/44'/60'/0'/0/0");
-    QString s = Status::multiAccountGenerateAndDeriveAddresses(5, 12, "", paths); 
+    engine.load(url);
+    //QString s = Status::multiAccountGenerateAndDeriveAddresses(5, 12, ""); 
 
     return app.exec();
 }
