@@ -60,6 +60,12 @@ QString addressToChecksum(QString address) {
 }
 
 Status::Status(QObject * parent): QObject(parent) {
+    SetSignalEventCallback((void *)&Status::statusGoEventCallback);
+
+}
+
+void Status::statusGoEventCallback(const char *event) {
+  qInfo() << "::statusGoEventCallback call - event: " << event;
 }
 
 QString Status::multiAccountGenerateAndDeriveAddresses(int n, int mnemonicPhraseLength, QString bip32Passphrase) {
@@ -87,7 +93,46 @@ QString Status::multiAccountGenerateAndDeriveAddresses(int n, int mnemonicPhrase
 }
 
 const QString dataDir = "./datadir";
+
+QString Status::prepareDirAndUpdateConfig(QString configString) {
+  qInfo() << "::prepareDirAndUpdateConfig call - configString:"
+                     << configString;
+
+  QJsonParseError jsonError;
+  const QJsonDocument &jsonDoc =
+      QJsonDocument::fromJson(configString.toUtf8(), &jsonError);
+  if (jsonError.error != QJsonParseError::NoError) {
+    qWarning() << jsonError.errorString();
+  }
+
+  QVariantMap configJSON = jsonDoc.toVariant().toMap();
+  QVariantMap shhextConfig = configJSON["ShhextConfig"].toMap();
+  qInfo() << "::startNode configString: " << configJSON;
+
+  int networkId = configJSON["NetworkId"].toInt();
+  QString relativeDataDirPath = configJSON["DataDir"].toString();
+  if (!relativeDataDirPath.startsWith("/"))
+    relativeDataDirPath.prepend("/");
+
+  configJSON["DataDir"] = relativeDataDirPath;
+  configJSON["KeyStoreDir"] = "keystore";
+  configJSON["LogDir"] = relativeDataDirPath;
+  configJSON["LogFile"] = "geth.log";
+
+  shhextConfig["BackupDisabledDataDir"] = relativeDataDirPath;
+
+  configJSON["ShhExtConfig"] = shhextConfig;
+
+  const QJsonDocument &updatedJsonDoc = QJsonDocument::fromVariant(configJSON);
+  qInfo() << "::startNode updated configString: "
+                    << updatedJsonDoc.toVariant().toMap();
+  return QString(updatedJsonDoc.toJson(QJsonDocument::Compact));
+}
+
 QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString password) {
+  const char * openAccountsResult = OpenAccounts(QString(dataDir).toUtf8().data());
+  qInfo() << "openAccounts result: " << openAccountsResult;
+
   const char * initKeystoreResult = InitKeystore(QString(dataDir + "/keystore").toUtf8().data());
   qInfo() << "initKeystoreResult: " << initKeystoreResult;
   // ::store-multiaccount
@@ -180,7 +225,7 @@ QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString pa
 
   // constants/default-multiaccount
   newMultiacc["preview-privacy?"] = true;
-  newMultiacc["wallet/visible-tokens"] = "{ mainnet: [\"SNT\"] }";
+  newMultiacc["wallet/visible-tokens"] = "";//"{ mainnet: [\"SNT\"] }";
   newMultiacc["currency"] = "usd";
   newMultiacc["appearance"] = 0;
   newMultiacc["waku-enabled"] = true;
@@ -199,7 +244,8 @@ QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString pa
 
   QFile fDefaultNetworks(":/resources/defaultNetworks.json");
   fDefaultNetworks.open(QIODevice::ReadOnly);
-  QJsonArray defaultNetworksJson = QJsonDocument::fromJson(fDefaultNetworks.readAll()).array();
+  QString defaultNetworksJson  = QString::fromUtf8(fDefaultNetworks.readAll());
+  ///QJsonArray defaultNetworksJson = QJsonDocument::fromJson(fDefaultNetworks.readAll()).array();
   settings["networks/networks"] = defaultNetworksJson;
 
   QFile fNodeConfig(":/resources/nodeConfig.json");
@@ -220,15 +266,18 @@ QString Status::saveAccountAndLogin(QString multiaccData,
                                           QString accountsData) {
 
   QString hashedPassword = QString::fromUtf8(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Keccak_256));
+  //QString hashedPassword = "0x2cd9bf92c5e20b1b410f5ace94d963a96e89156fbe65b70365e8596b37f1f165";
   qInfo() << "## in saveAccountAndLogin multiaccData: " << multiaccData;
   qInfo() << "## in saveAccountAndLogin settings: " << settings;
   qInfo() << "## in saveAccountAndLogin nodeConfig: " << nodeConfig;
   qInfo() << "## in saveAccountAndLogin accountsData: " << accountsData;
 
+  QString finalConfig = prepareDirAndUpdateConfig(nodeConfig);
+
   const char * result = SaveAccountAndLogin(multiaccData.toUtf8().data(),
                                           hashedPassword.toUtf8().data(),
                                           settings.toUtf8().data(),
-                                          nodeConfig.toUtf8().data(),
+                                          finalConfig.toUtf8().data(),
                                           accountsData.toUtf8().data());
 
   return QString(result);

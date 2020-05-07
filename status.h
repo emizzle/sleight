@@ -23,6 +23,9 @@ public:
                                           QString nodeConfig,
                                           QString accountsData);
 
+private:
+  static void statusGoEventCallback(const char *event);
+  QString prepareDirAndUpdateConfig(QString configString);
 };
 
 #endif // STATUS_H
