@@ -16,7 +16,12 @@ public:
 
   Q_INVOKABLE QString multiAccountStoreDerivedAccounts(QString accountJson, QString password);
   Q_INVOKABLE QString generateAlias(QString publicKey);
-  Q_INVOKABLE QString identicon(QString publicKey);
+  Q_INVOKABLE QString generateIdenticon(QString publicKey);
+  Q_INVOKABLE QString saveAccountAndLogin(QString multiaccData,
+                                          QString password,
+                                          QString settings,
+                                          QString nodeConfig,
+                                          QString accountsData);
 
 };
 

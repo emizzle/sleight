@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QRegularExpression>
 #include <QUuid>
+#include <QFile>
 
 const QString pathWalletRoot("m/44'/60'/0'/0");
 // EIP1581 Root Key, the extended key from which any whisper key/encryption key can be derived
@@ -16,6 +17,16 @@ const QString pathEip1581("m/43'/60'/1581'");
 const QString pathDefaultWallet(pathWalletRoot + "/0");
 // EIP1581 Chat Key 0, the default whisper key
 const QString pathWhisper(pathEip1581  + "/0'/0");
+
+QString jsonToStr(QJsonObject & obj) {
+  QJsonDocument doc(obj);
+  return QString::fromUtf8(doc.toJson());
+}
+
+QString jsonToStr(QJsonArray & arr) {
+  QJsonDocument doc(arr);
+  return QString::fromUtf8(doc.toJson());
+}
 
 QString addressToChecksum(QString address) {
 /**
@@ -29,22 +40,23 @@ QString addressToChecksum(QString address) {
  */
   QRegularExpression re("^0x[0-9a-f]{40}$", QRegularExpression::CaseInsensitiveOption);
   if (!re.match(address).hasMatch()) {
-    throw Exception("Given address " + address + " is not a valid Ethereum address.");
+    //throw QString("Given address " + address + " is not a valid Ethereum address.");
+    return "";
   }
 
-    const stripAddress = address.right(40).toLower();
-    const prefix = "";
+    const QString stripAddress = address.right(40).toLower();
+    const QString prefix = "";
     //const keccakHash = Hash.keccak256(prefix + stripAddress).toString('hex').replace(/^0x/i, '');
     const QString keccakHash = QString::fromUtf8(QCryptographicHash::hash((prefix + stripAddress).toUtf8(), QCryptographicHash::Keccak_256));
     QString checksumAddress = "0x";
 
     for (int i = 0; i < stripAddress.length(); ++i) {
-      int val = keccakHash[i].toInt(nullptr, 16);
+      QString s = keccakHash[i];
+      int val = s.toInt(nullptr, 16);
         checksumAddress += val >= 8 ? stripAddress[i].toUpper() : stripAddress[i];
     }
 
     return checksumAddress;
-}
 }
 
 Status::Status(QObject * parent): QObject(parent) {
@@ -67,17 +79,20 @@ QString Status::multiAccountGenerateAndDeriveAddresses(int n, int mnemonicPhrase
     obj["paths"] = pathsArr;
     QJsonDocument doc(obj);
     //qInfo() << "doc: " << QString::fromUtf8(doc.toJson());
-    const char * result = MultiAccountGenerateAndDeriveAddresses(QString::fromUtf8(doc.toJson()).toUtf8().data());
+    const char * result = MultiAccountGenerateAndDeriveAddresses(doc.toJson().data());
     //qInfo() << "libstatus result: " << result;
 
     return QString(result);
 
 }
 
+const QString dataDir = "./datadir";
 QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString password) {
+  const char * initKeystoreResult = InitKeystore(QString(dataDir + "/keystore").toUtf8().data());
+  qInfo() << "initKeystoreResult: " << initKeystoreResult;
   // ::store-multiaccount
-  QJsonObject accountJsonObj = QJsonDocument::fromJson(accountJson).object();
-  QString accountId = accountJsonObj["id"];
+  QJsonObject accountJsonObj = QJsonDocument::fromJson(accountJson.toUtf8()).object();
+  QString accountId = accountJsonObj["id"].toString();
   QJsonObject obj;
   obj["accountID"] = accountId;
   QJsonArray pathsArr;
@@ -86,80 +101,79 @@ QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString pa
   pathsArr.append(pathWhisper);
   pathsArr.append(pathDefaultWallet);
   obj["paths"] = pathsArr;
+
+
+  qInfo() << "## before hash: ";
   QString hashedPassword = QString::fromUtf8(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Keccak_256));
   obj["password"] = hashedPassword;
   QJsonDocument doc(obj);
   qInfo() << "doc: " << QString::fromUtf8(doc.toJson());
-  const char * result = MultiAccountStoreDerivedAccounts(QString::fromUtf8(doc.toJson()).toUtf8().data());
+  qInfo() << "## before MultiAccountStoreDerivedAccounts: ";
+  const char * result = MultiAccountStoreDerivedAccounts(doc.toJson().data());
 
-  QJsonDocument resultDoc = QJsonDocument::fromJson(QString(result));
+  QJsonObject resultObj = QJsonDocument::fromJson(QString(result).toUtf8()).object();
 
+  qInfo() << "## after MultiAccountStoreDerivedAccounts: " << result;
   // ::store-multiaccount callback
-  QJsonObject resultObj = resultDoc.object();
-  QJsonValue pathWhisperValue = resultObj.value(pathWhisper);
-  QJsonValue publicKey = pathWhisperValue.value("publicKey").toString();
+  QJsonObject pathWhisperObj = resultObj.value(pathWhisper).toObject();
+  QString publicKey = pathWhisperObj.value("publicKey").toString();
   QString alias = generateAlias(publicKey);
-  QString identicon = identicon(publicKey);
+  qInfo() << "## after generateAlias: " << alias;
+  QString identicon = generateIdenticon(publicKey);
+  qInfo() << "## after generateIdenticon: " << identicon;
 
-  pathWhisperValue["name"] = alias;
-  pathWhisperValue["photo-path"] = identicon;
+  pathWhisperObj["name"] = alias;
+  pathWhisperObj["photo-path"] = identicon;
 
   // ::store-multiaccount-success
   accountJsonObj["derived"] = resultObj;
   QString signingPhrase = "bake ball band"; // TODO
   bool saveMnemonic = true;
   QString randomGuid = QUuid::createUuid().toString();
+  qInfo() << "## after createUuid: " << randomGuid;
 
   // on-multiaccount-created
   // 1. prepare-accounts-data
-   (let [{:keys [public-key address name photo-path]}
-         (get-in multiaccount [:derived constants/path-whisper-keyword])]
-     {:public-key public-key
-      :address    (eip55/address->checksum address)
-      :name       name
-      :photo-path photo-path
-      :path       constants/path-whisper
-      :chat       true})])
 
-  QJsonValue pathWalletValue = resultObj.value(pathDefaultWallet);
+  QJsonObject pathWalletObj = resultObj.value(pathDefaultWallet).toObject();
   QJsonObject walletAccount;
-  walletAccount["public-key"] = pathWalletValue["publicKey"];
-  walletAccount["address"] = addressToChecksum(pathWalletValue["address"]);
+  walletAccount["public-key"] = pathWalletObj["publicKey"].toString();
+  walletAccount["address"] = addressToChecksum(pathWalletObj["address"].toString());
   walletAccount["color"] = "blue";
   walletAccount["wallet"] = true;
   walletAccount["path"] = pathDefaultWallet;
   walletAccount["name"] = "Status account";
 
   QJsonObject whisperAccount;
-  whisperAccount["public-key"] = pathWhisperValue["publicKey"];
-  whisperAccount["address"] = addressToChecksum(pathWhisperValue["address"]);
-  whisperAccount["name"] = pathWhisperValue["name"];
-  whisperAccount["photo-path"] = pathWhisperValue["photoPath"];
+  whisperAccount["public-key"] = pathWhisperObj["publicKey"].toString();
+  whisperAccount["address"] = addressToChecksum(pathWhisperObj["address"].toString());
+  whisperAccount["name"] = pathWhisperObj["name"].toString();
+  whisperAccount["photo-path"] = pathWhisperObj["photoPath"].toString();
   whisperAccount["path"] = pathWhisper;
   whisperAccount["chat"] = true;
 
   QJsonArray accountsData;
-  accountsData.add(walletAccount);
-  accountsData.add(whisperAccount);
+  accountsData.append(walletAccount);
+  accountsData.append(whisperAccount);
 
   // 2. let bindings
 
   QJsonObject multiaccData;
   multiaccData["name"] = alias;
-  multiaccData["address"] = accountJsonObj["address"];
+  multiaccData["address"] = accountJsonObj["address"].toString();
   multiaccData["photo-path"] = identicon;
-  multiaccData["key-uid"] = accountJsonObj["keyUid"];
-  QString eip1581Addr = resultObj.value(pathEip1581).value("address");
+  multiaccData["key-uid"] = accountJsonObj["keyUid"].toString();
+  QString eip1581Addr = resultObj.value(pathEip1581).toObject().value("address").toString();
 
   // 2.1 new-multiaccount
   QJsonObject newMultiacc;
-  newMultiacc["address"] = accountJsonObj["address"];
-  newMultiacc["key-uid"] = accountJsonObj["keyUid"];
-  newMultiacc["wallet-root-address"] = resultObj[pathWalletRoot]["address"];
+  newMultiacc["address"] = accountJsonObj["address"].toString();
+  newMultiacc["key-uid"] = accountJsonObj["keyUid"].toString();
+  newMultiacc["wallet-root-address"] = resultObj[pathWalletRoot].toObject()["address"].toString();
   newMultiacc["name"] = alias;
   newMultiacc["photo-path"] = identicon;
-  newMultiacc["public-key"] = whisperAccount["publicKey"];
-  newMultiacc["dapps-address"] = walletAccount["address"];
+  newMultiacc["public-key"] = whisperAccount["publicKey"].toString();
+  newMultiacc["dapps-address"] = walletAccount["address"].toString();
   newMultiacc["latest-derived-path"] = 0;
   newMultiacc["signing-phrase"] = signingPhrase;
   newMultiacc["installation-id"] = randomGuid;
@@ -176,24 +190,48 @@ QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString pa
     newMultiacc["eip1581-address"] = eip1581Addr;
   }
   if (saveMnemonic) {
-    newMultiacc["mnemonic"] = accountJsonObj["mnemonic"];
+    newMultiacc["mnemonic"] = accountJsonObj["mnemonic"].toString();
   }
 
   // 2.2 settings
   QJsonObject settings(newMultiacc);
   settings["networks/current-network"] = "mainnet_rpc";
-  settings["networks/networks"] = defaultNetworks;
 
+  QFile fDefaultNetworks(":/resources/defaultNetworks.json");
+  fDefaultNetworks.open(QIODevice::ReadOnly);
+  QJsonArray defaultNetworksJson = QJsonDocument::fromJson(fDefaultNetworks.readAll()).array();
+  settings["networks/networks"] = defaultNetworksJson;
 
-  saveAccountAndLogin(multiaccData, 
-      QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Keccak_256),
-      settings,
-      nodeConfig,
-      accountsData);
+  QFile fNodeConfig(":/resources/nodeConfig.json");
+  fNodeConfig.open(QIODevice::ReadOnly);
+  QString nodeConfigJson = QString::fromUtf8(fNodeConfig.readAll());
 
+  qInfo() << "## before saveAccountAndLogin ";
+  return saveAccountAndLogin(jsonToStr(multiaccData), password,
+      jsonToStr(settings),
+      nodeConfigJson,
+      jsonToStr(accountsData));
+}
 
-  return resultDoc.toJson();
+QString Status::saveAccountAndLogin(QString multiaccData,
+                                          QString password,
+                                          QString settings,
+                                          QString nodeConfig,
+                                          QString accountsData) {
 
+  QString hashedPassword = QString::fromUtf8(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Keccak_256));
+  qInfo() << "## in saveAccountAndLogin multiaccData: " << multiaccData;
+  qInfo() << "## in saveAccountAndLogin settings: " << settings;
+  qInfo() << "## in saveAccountAndLogin nodeConfig: " << nodeConfig;
+  qInfo() << "## in saveAccountAndLogin accountsData: " << accountsData;
+
+  const char * result = SaveAccountAndLogin(multiaccData.toUtf8().data(),
+                                          hashedPassword.toUtf8().data(),
+                                          settings.toUtf8().data(),
+                                          nodeConfig.toUtf8().data(),
+                                          accountsData.toUtf8().data());
+
+  return QString(result);
 }
 
 QString Status::generateAlias(QString publicKey) {
@@ -203,7 +241,7 @@ QString Status::generateAlias(QString publicKey) {
   return QString(result);
 }
 
-QString Status::identicon(QString publicKey) {
+QString Status::generateIdenticon(QString publicKey) {
   QByteArray ba = publicKey.toUtf8();
   const char * result = Identicon({ba.data(), ba.length()});
 

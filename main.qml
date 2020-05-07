@@ -43,7 +43,7 @@ ApplicationWindow {
         onClicked: {
           let generatedAccounts = Status.multiAccountGenerateAndDeriveAddresses(5, 12, "");
           console.log("js generatedAccounts: " + generatedAccounts);
-          swipeView.generatedAccounts = generatedAccounts;
+          swipeView.generatedAccounts = JSON.parse(generatedAccounts);
           swipeView.incrementCurrentIndex();
         }
       }
@@ -198,7 +198,8 @@ ApplicationWindow {
           }
           else {
             swipeView.incrementCurrentIndex();
-            let selectedAccount = generatedAccounts[wizardStep2.selectedIndex];
+            let selectedAccount = swipeView.generatedAccounts[wizardStep2.selectedIndex];
+            console.log("selectedAccount: " + JSON.stringify(selectedAccount));
             let storeResponse = Status.multiAccountStoreDerivedAccounts(JSON.stringify(selectedAccount), passwordInput.text);
             console.log("storeResponse: " + storeResponse);
             selectedAccount.derived = JSON.parse(storeResponse);
@@ -210,10 +211,9 @@ ApplicationWindow {
       if (generatedAccounts == null) {
         return;
       }
-      let accJson = JSON.parse(generatedAccounts);
       generatedAccountsModel.clear();
-      for (let i = 0; i < accJson.length; ++i) {
-        let acc = accJson[i];
+      for (let i = 0; i < generatedAccounts.length; ++i) {
+        let acc = generatedAccounts[i];
         console.log("acc: " + JSON.stringify(acc));
         let alias = Status.generateAlias(acc.publicKey);
         generatedAccountsModel.append({"publicKey": acc.publicKey, "alias": alias});
