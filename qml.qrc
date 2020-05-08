@@ -1,6 +1,9 @@
 <RCC>
     <qresource prefix="/">
         <file>main.qml</file>
+        <file>introWizard.qml</file>
+        <file>login.qml</file>
+        <file>panes.qml</file>
         <file>resources/defaultNetworks.json</file>
         <file>resources/nodeConfig.json</file>
     </qresource>
