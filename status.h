@@ -22,6 +22,9 @@ public:
                                           QString settings,
                                           QString nodeConfig,
                                           QString accountsData);
+  Q_INVOKABLE QString openAccounts();
+  Q_INVOKABLE QString initKeystore();
+
 
 private:
   static void statusGoEventCallback(const char *event);

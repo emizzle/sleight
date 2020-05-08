@@ -18,6 +18,8 @@ const QString pathDefaultWallet(pathWalletRoot + "/0");
 // EIP1581 Chat Key 0, the default whisper key
 const QString pathWhisper(pathEip1581  + "/0'/0");
 
+const QString dataDir = "./datadir";
+
 QString jsonToStr(QJsonObject & obj) {
   QJsonDocument doc(obj);
   return QString::fromUtf8(doc.toJson());
@@ -60,7 +62,8 @@ QString addressToChecksum(QString address) {
 }
 
 Status::Status(QObject * parent): QObject(parent) {
-    SetSignalEventCallback((void *)&Status::statusGoEventCallback);
+  SetSignalEventCallback((void *)&Status::statusGoEventCallback);
+
 
 }
 
@@ -92,7 +95,6 @@ QString Status::multiAccountGenerateAndDeriveAddresses(int n, int mnemonicPhrase
 
 }
 
-const QString dataDir = "./datadir";
 
 QString Status::prepareDirAndUpdateConfig(QString configString) {
   qInfo() << "::prepareDirAndUpdateConfig call - configString:"
@@ -130,11 +132,6 @@ QString Status::prepareDirAndUpdateConfig(QString configString) {
 }
 
 QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString password) {
-  const char * openAccountsResult = OpenAccounts(QString(dataDir).toUtf8().data());
-  qInfo() << "openAccounts result: " << openAccountsResult;
-
-  const char * initKeystoreResult = InitKeystore(QString(dataDir + "/keystore").toUtf8().data());
-  qInfo() << "initKeystoreResult: " << initKeystoreResult;
   // ::store-multiaccount
   QJsonObject accountJsonObj = QJsonDocument::fromJson(accountJson.toUtf8()).object();
   QString accountId = accountJsonObj["id"].toString();
@@ -294,4 +291,16 @@ QString Status::generateIdenticon(QString publicKey) {
   const char * result = Identicon({ba.data(), ba.length()});
 
   return QString(result);
+}
+
+QString Status::openAccounts() {
+  const char * openAccountsResult = OpenAccounts(QString(dataDir).toUtf8().data());
+  qInfo() << "openAccounts result: " << openAccountsResult;
+  return openAccountsResult;
+}
+
+QString Status::initKeystore() {
+  const char * initKeystoreResult = InitKeystore(QString(dataDir + "/keystore").toUtf8().data());
+  qInfo() << "initKeystoreResult: " << initKeystoreResult;
+  return initKeystoreResult;
 }

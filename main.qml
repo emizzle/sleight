@@ -12,6 +12,14 @@ ApplicationWindow {
   height: 500
   visible: true
 
+  Component.onCompleted: {
+    console.log("applicationwindow loaded");
+    Status.initKeystore();
+    let accountsStr = Status.openAccounts();
+    let accounts = JSON.parse(accountsStr);
+    console.log("openAccounts response: " + accountsStr);
+  }
+
   SwipeView {
     id: swipeView
     anchors.fill: parent
