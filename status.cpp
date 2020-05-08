@@ -244,8 +244,7 @@ QString Status::multiAccountStoreDerivedAccounts(QString accountJson, QString pa
 
   QFile fDefaultNetworks(":/resources/defaultNetworks.json");
   fDefaultNetworks.open(QIODevice::ReadOnly);
-  QString defaultNetworksJson  = QString::fromUtf8(fDefaultNetworks.readAll());
-  ///QJsonArray defaultNetworksJson = QJsonDocument::fromJson(fDefaultNetworks.readAll()).array();
+  QJsonArray defaultNetworksJson = QJsonDocument::fromJson(fDefaultNetworks.readAll()).array();
   settings["networks/networks"] = defaultNetworksJson;
 
   QFile fNodeConfig(":/resources/nodeConfig.json");
