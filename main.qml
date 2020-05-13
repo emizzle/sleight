@@ -12,11 +12,13 @@ ApplicationWindow {
   height: 500
   visible: true
 
+  property var accounts: null
+
   Component.onCompleted: {
     console.log("applicationwindow loaded");
     Status.initKeystore();
     let accountsStr = Status.openAccounts();
-    let accounts = JSON.parse(accountsStr);
+    accounts = JSON.parse(accountsStr);
     //console.log("openAccounts response: " + accountsStr);
     if (accounts.length > 0) {
       mainPane.source = "login.qml";
@@ -29,8 +31,12 @@ ApplicationWindow {
     }
   }
 
-  function handleLogin(accountId) {
+  function handleLogin(accountId, password) {
     console.log("handleLogin: " + accountId);
+    let account = accounts.find(el => el["key-uid"] == accountId);
+    console.log("handleLogin: " + JSON.stringify(account));
+    mainPane.source = "panes.qml";
+
   }
 
    Loader {
@@ -39,5 +45,12 @@ ApplicationWindow {
      anchors.fill: parent
    }
   
+   Connections {
+     target: Status
+     onPrivateRPCResult: {
+       console.log("onPrivateRPCResult: " + result);
+     }
+
+   }
 
 }

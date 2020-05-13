@@ -23,8 +23,12 @@ public:
                                           QString nodeConfig,
                                           QString accountsData);
   Q_INVOKABLE QString openAccounts();
+  Q_INVOKABLE QString login(QString loginData, QString password);
   Q_INVOKABLE QString initKeystore();
+  Q_INVOKABLE void callPrivateRPC(QString payload);
 
+signals:
+  void privateRPCResult(QString result);
 
 private:
   static void statusGoEventCallback(const char *event);

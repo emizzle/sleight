@@ -7,8 +7,13 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QRegularExpression>
+#include <QCoreApplication>
 #include <QUuid>
 #include <QFile>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrent>
 
 const QString pathWalletRoot("m/44'/60'/0'/0");
 // EIP1581 Root Key, the extended key from which any whisper key/encryption key can be derived
@@ -18,7 +23,7 @@ const QString pathDefaultWallet(pathWalletRoot + "/0");
 // EIP1581 Chat Key 0, the default whisper key
 const QString pathWhisper(pathEip1581  + "/0'/0");
 
-const QString dataDir = "./datadir";
+const QString dataDir = "/datadir";
 
 QString jsonToStr(QJsonObject & obj) {
   QJsonDocument doc(obj);
@@ -68,7 +73,7 @@ Status::Status(QObject * parent): QObject(parent) {
 }
 
 void Status::statusGoEventCallback(const char *event) {
-  qInfo() << "::statusGoEventCallback call - event: " << event;
+  //qInfo() << "::statusGoEventCallback call - event: " << event;
 }
 
 QString Status::multiAccountGenerateAndDeriveAddresses(int n, int mnemonicPhraseLength, QString bip32Passphrase) {
@@ -294,13 +299,40 @@ QString Status::generateIdenticon(QString publicKey) {
 }
 
 QString Status::openAccounts() {
-  const char * openAccountsResult = OpenAccounts(QString(dataDir).toUtf8().data());
+  QString fullDirPath = QCoreApplication::applicationDirPath() + dataDir;
+  qInfo() << "fullDirPath: " << fullDirPath;
+  const char * openAccountsResult = OpenAccounts(fullDirPath.toUtf8().data());
   qInfo() << "openAccounts result: " << openAccountsResult;
   return openAccountsResult;
 }
 
 QString Status::initKeystore() {
-  const char * initKeystoreResult = InitKeystore(QString(dataDir + "/keystore").toUtf8().data());
+  QString fullDirPath = QCoreApplication::applicationDirPath() + dataDir;
+  const char * initKeystoreResult = InitKeystore(QString(fullDirPath + "/keystore").toUtf8().data());
   qInfo() << "initKeystoreResult: " << initKeystoreResult;
   return initKeystoreResult;
 }
+
+QString Status::login(QString loginData, QString password) {
+  QString hashedPassword = QString::fromUtf8(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Keccak_256));
+  const char * result = Login(loginData.toUtf8().data(), hashedPassword.toUtf8().data());
+
+  qInfo() << "Login() result: " << result;
+
+  return result;
+}
+
+void Status::callPrivateRPC(QString payload) {
+  QFutureWatcher<char *> *watcher = new QFutureWatcher<char *>();
+  qInfo() << "callPrivateRPC payload: " + payload;
+  connect(watcher, &QFutureWatcher<char *>::finished, [&]() {
+        char * result = watcher->future().result();
+        qInfo() << "callPrivateRPC result: " << result;
+        emit privateRPCResult(result);
+      });
+  QFuture<char *> result = QtConcurrent::run(CallPrivateRPC, payload.toUtf8().data());
+  //const char *result = CallPrivateRPC(payload.toUtf8().data());
+  watcher->setFuture(result);
+}
+
+

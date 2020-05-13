@@ -14,7 +14,7 @@ SwipeView {
   anchors.fill: parent
   currentIndex: 0
 
-  signal login(string accountId)
+  signal login(string accountId, string password)
 
   // Option 1 (property change signal)
   // onAccountsChanged: {
@@ -32,6 +32,7 @@ SwipeView {
 
   // Option 2 (invoke fn directly)
   function loadAccounts(accounts) {
+    swipeView.accounts = accounts;
     for (let i = 0; i < accounts.length; ++i) {
       let acc = accounts[i];
       accountsListModel.append({"name": acc.name, "keyUid": acc["key-uid"]});
@@ -111,8 +112,17 @@ SwipeView {
       anchors.bottom: parent.bottom
       anchors.bottomMargin: 20
       onClicked: {
-        console.log("password: " + passwordInput.text);
-        swipeView.login(accountsListModel.get(swipeView.selectedAccount)["keyUid"]);
+        let password = passwordInput.text;
+        console.log("password: " + password);
+        let accountId = accountsListModel.get(swipeView.selectedAccount)["keyUid"];
+        let account = swipeView.accounts.find(el => el["key-uid"] == accountId);
+        let resp = Status.login(JSON.stringify({"name": account["name"],
+                          "key-uid": account["key-uid"],
+                          "photo-path": account["photo-path"]}),
+                          password);
+        if (!resp.error) {
+          swipeView.login(accountId, passwordInput.text);
+      }
       }
     }
   }
